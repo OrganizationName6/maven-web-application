@@ -1,0 +1,30 @@
+node
+{
+    properties([[$class: 'JiraProjectProperty'], buildDiscarder(logRotator(artifactDaysToKeepStr: '30', artifactNumToKeepStr: '5', daysToKeepStr: '30', numToKeepStr: '5')), parameters([choice(choices: ['master', 'development', 'qa'], description: 'Select the branch to be built', name: 'SelectBranch')]), [$class: 'JobLocalConfiguration', changeReasonComment: '']])
+    
+    def mavenHome = tool name: "maven3.6.2"
+    
+    stage("CheckoutCode")
+    {
+        git branch: '${SelectBranch}', credentialsId: '56e5805f-b154-4c1f-82dc-06dc993d9b44', url: 'https://github.com/OrganizationName6/maven-web-application.git'
+    }
+    stage("BuildBranch")
+    {
+        sh "${mavenHome}/bin/mvn clean package"
+    }
+    stage("SonarQubeReport")
+    {
+        sh "${mavenHome}/bin/mvn sonar:sonar"
+    }
+    stage("UploadArtifact")
+    {
+        sh "${mavenHome}/bin/mvn deploy"
+    }
+    stage("DeployToTomcat")
+    {
+        sshagent(['accf3da9-9f2b-4522-8104-557f90853d17']) 
+        {
+            sh "scp -o StrictHostKeyChecking=no target/maven-web-application.war ec2-user@34.207.175.153:/opt/apache-tomcat-9.0.40/webapps"
+        }
+    }
+}
